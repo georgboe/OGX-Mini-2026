@@ -29,6 +29,10 @@ private:
         GET_PROFILE_BY_IDX = 0x55,
         SET_PROFILE_START = 0x60,
         SET_PROFILE = 0x61,
+        PS4_KEYS_UPLOAD = 0x70,
+        PS4_KEYS_STATUS = 0x71,
+        PS4_KEYS_QUERY = 0x72,
+        PS4_KEYS_PRESENT = 0x73,
         SET_GP_IN = 0x80,
         SET_GP_OUT = 0x81,
         RESP_ERROR = 0xFF

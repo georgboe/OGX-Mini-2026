@@ -227,7 +227,7 @@ sudo evtest   # select the mouse interface; drag touchpad for REL_X / REL_Y
 
 **Goal:** In **PS3** and **PS4 (DualShock 4 USB gadget)** modes, pass **accelerometer** (and **gyro** when available) from modern input controllers into the emulated report so titles that use tilt / gyro respond correctly. **Switch** output mode does **not** pass through motion for now (Pro report IMU bytes stay zero).
 
-**Important — PS4 mode is not licensed PS4 console output:** **PS4 mode is made for motion controls to work on authentication dongles.** It does **not** enable native PS4 output by itself. **PS4 output requires authentication from a licensed dongle**, and that auth is **not supported directly by this firmware**.
+**PS4 authentication:** PS4 mode now handles the DS4 feature-report challenge flow and can sign challenges using a compatible, user-supplied key bundle installed from the WebApp (PS4 keys page). The firmware does not ship or generate keys. With no compatible bundle installed, use the mode for PC testing or with an external authentication adapter. Xbox controllers already feed the same `Gamepad::PadIn` path, so no Xbox-specific PS4 output logic is needed.
 
 **Important — console wiring (PS3/PS4):** OGX-Mini is a **USB gadget** (it emulates a controller to a **host**). It does **not** replace a Brook-style dongle on its own. To play **motion games on a real PlayStation 3 or PlayStation 4**, chain:
 

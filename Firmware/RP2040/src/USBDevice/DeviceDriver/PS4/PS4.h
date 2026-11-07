@@ -28,6 +28,7 @@ private:
 	uint16_t frame_seq_{0};
 	uint8_t touch_seq_{0};
 	uint8_t sys_button_latch_frames_{0};
+	std::array<uint8_t, 64> auth_report_{};
 };
 
 #endif

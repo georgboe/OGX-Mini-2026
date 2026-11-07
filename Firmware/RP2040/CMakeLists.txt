@@ -70,6 +70,21 @@ set(SOURCES_BOARD
     ${SRC}/USBDevice/DeviceDriver/PSClassic/PSClassic.cpp
     ${SRC}/USBDevice/DeviceDriver/PS3/PS3.cpp
     ${SRC}/USBDevice/DeviceDriver/PS4/PS4.cpp
+    ${SRC}/USBDevice/DeviceDriver/PS4/PS4Auth.cpp
+    ${PICO_SDK_PATH}/lib/mbedtls/library/bignum.c
+    ${PICO_SDK_PATH}/lib/mbedtls/library/rsa.c
+    ${PICO_SDK_PATH}/lib/mbedtls/library/rsa_internal.c
+    ${PICO_SDK_PATH}/lib/mbedtls/library/sha256.c
+    ${PICO_SDK_PATH}/lib/mbedtls/library/md.c
+    ${PICO_SDK_PATH}/lib/mbedtls/library/md2.c
+    ${PICO_SDK_PATH}/lib/mbedtls/library/md4.c
+    ${PICO_SDK_PATH}/lib/mbedtls/library/md5.c
+    ${PICO_SDK_PATH}/lib/mbedtls/library/ripemd160.c
+    ${PICO_SDK_PATH}/lib/mbedtls/library/sha1.c
+    ${PICO_SDK_PATH}/lib/mbedtls/library/sha512.c
+    ${PICO_SDK_PATH}/lib/mbedtls/library/platform.c
+    ${PICO_SDK_PATH}/lib/mbedtls/library/platform_util.c
+    ${PICO_SDK_PATH}/lib/mbedtls/library/constant_time.c
     ${SRC}/USBDevice/DeviceDriver/Steam/Steam.cpp
     ${SRC}/USBDevice/DeviceDriver/Steam/SteamTouchpad.cpp
     ${SRC}/USBDevice/DeviceDriver/Switch/Switch.cpp
@@ -563,8 +578,10 @@ pico_set_program_version(${FW_NAME} ${FW_VERSION})
 target_include_directories(${FW_NAME} PRIVATE 
     ${SRC}
     ${EXTERNAL_DIR}/libxsm3
+    ${PICO_SDK_PATH}/lib/mbedtls/include
+    ${PICO_SDK_PATH}/lib/mbedtls/library
 )
-target_compile_definitions(${FW_NAME} PRIVATE XSM3_NO_DEBUGGING=1 XSM3_EMBEDDED=1)
+target_compile_definitions(${FW_NAME} PRIVATE XSM3_NO_DEBUGGING=1 XSM3_EMBEDDED=1 MBEDTLS_CONFIG_FILE="mbedtls/config.h")
 
 if(EN_RGB)
     pico_generate_pio_header(${FW_NAME} ${SRC}/Board/Pico_WS2812/WS2812.pio)

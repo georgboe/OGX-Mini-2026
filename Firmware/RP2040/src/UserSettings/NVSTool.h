@@ -154,15 +154,16 @@ private:
 
     void update_entry(uint32_t index, const std::string& key, const void* buffer, size_t len)
     {
-        uint32_t entry_offset = index * sizeof(Entry);
-        uint32_t sector_offset = ((NVS_START_OFFSET + entry_offset) / FLASH_SECTOR_SIZE) * FLASH_SECTOR_SIZE;
+        const uint32_t entry_offset = index * sizeof(Entry);
+        const uint32_t sector_offset = ((NVS_START_OFFSET + entry_offset) / FLASH_SECTOR_SIZE) * FLASH_SECTOR_SIZE;
+        const uint32_t sector_entry_offset = entry_offset % FLASH_SECTOR_SIZE;
 
         std::array<uint8_t, FLASH_SECTOR_SIZE> sector_buffer;
         std::memcpy(sector_buffer.data(), reinterpret_cast<const uint8_t*>(XIP_BASE + sector_offset), FLASH_SECTOR_SIZE);
 
         flash_range_erase(sector_offset, FLASH_SECTOR_SIZE);
 
-        Entry* entry_to_write = reinterpret_cast<Entry*>(sector_buffer.data() + entry_offset);
+        Entry* entry_to_write = reinterpret_cast<Entry*>(sector_buffer.data() + sector_entry_offset);
 
         *entry_to_write = Entry();
         std::strncpy(entry_to_write->key, key.c_str(), key.size());

@@ -4,6 +4,7 @@
 #include "pico/time.h"
 #include "Gamepad/MotionImu.h"
 #include "USBDevice/DeviceDriver/PS4/PS4.h"
+#include "USBDevice/DeviceDriver/PS4/PS4Auth.h"
 #include "Descriptors/PS4Usb.h"
 
 namespace {
@@ -77,6 +78,8 @@ void apply_pad_imu_to_ps4_report(std::array<uint8_t, 64>& rep, const Gamepad::Pa
 
 void PS4Device::initialize()
 {
+	PS4Auth::reset();
+	(void)PS4Auth::has_bundle();
 	class_driver_ = {
 		.name = TUD_DRV_NAME("PS4"),
 		.init = hidd_init,
@@ -96,6 +99,8 @@ void PS4Device::initialize()
 void PS4Device::process(const uint8_t idx, Gamepad& gamepad)
 {
 	(void)idx;
+	// RSA-PSS signing is deliberately deferred out of the USB control callback.
+	PS4Auth::process();
 	{
 		static bool start_wake_sent = false;
 		static bool start_held = false;
@@ -227,6 +232,22 @@ void PS4Device::process(const uint8_t idx, Gamepad& gamepad)
 	std::memcpy(&report_in_[10], &frame_seq_, sizeof(frame_seq_));
 	report_in_[12] = 0;
 
+	// Default power/charging and unpressed centered touchpad so PS4 accepts the report
+	report_in_[27] = (1835 >> 8) & 0xFF;
+	report_in_[28] = 1835 & 0xFF;
+	report_in_[29] = 0x1B; // charging (bit 4) + power level 0x0B
+
+	report_in_[33] = 0x00;
+	report_in_[34] = 0x00;
+	report_in_[35] = 0x80; // p1 unpressed
+	report_in_[36] = 0xC0; // p1 x=960 (0x3C0), y=471 (0x1D7)
+	report_in_[37] = 0x73;
+	report_in_[38] = 0x1D;
+	report_in_[39] = 0x80; // p2 unpressed
+	report_in_[40] = 0xC0; // p2 x=960, y=471
+	report_in_[41] = 0x73;
+	report_in_[42] = 0x1D;
+
 	apply_pad_imu_to_ps4_report(report_in_, gp_in);
 
 	if (tud_hid_ready()) {
@@ -246,14 +267,18 @@ uint16_t PS4Device::get_report_cb(uint8_t itf, uint8_t report_id, hid_report_typ
 {
 	(void)itf;
 	if (report_type == HID_REPORT_TYPE_INPUT) {
-		if (report_id == 0 || report_id == kReportIdIn) {
+		if (report_id == 0) {
 			const uint16_t n = static_cast<uint16_t>(std::min<size_t>(reqlen, report_in_.size()));
 			std::memcpy(buffer, report_in_.data(), n);
 			return n;
 		}
+		if (report_id == kReportIdIn) {
+			const uint16_t n = static_cast<uint16_t>(std::min<size_t>(reqlen, report_in_.size() - 1));
+			std::memcpy(buffer, report_in_.data() + 1, n);
+			return n;
+		}
 	} else if (report_type == HID_REPORT_TYPE_FEATURE) {
-		std::memset(buffer, 0, reqlen);
-		return reqlen;
+		return PS4Auth::handle_get_report(report_id, buffer, reqlen);
 	}
 	return 0;
 }
@@ -261,6 +286,18 @@ uint16_t PS4Device::get_report_cb(uint8_t itf, uint8_t report_id, hid_report_typ
 void PS4Device::set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t report_type, uint8_t const *buffer, uint16_t bufsize)
 {
 	(void)itf;
+	if (report_type == HID_REPORT_TYPE_FEATURE) {
+		uint8_t rid = report_id;
+		const uint8_t* payload = buffer;
+		size_t length = bufsize;
+		if (rid == 0 && length > 0) {
+			rid = payload[0];
+			++payload;
+			--length;
+		}
+		PS4Auth::handle_set_report(rid, payload, length);
+		return;
+	}
 	if (report_type != HID_REPORT_TYPE_OUTPUT) {
 		return;
 	}
@@ -288,6 +325,10 @@ bool PS4Device::vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_contr
 
 const uint16_t* PS4Device::get_descriptor_string_cb(uint8_t index, uint16_t langid)
 {
+	(void)langid;
+	if (index >= sizeof(PS4Usb::STRING_DESCRIPTORS) / sizeof(PS4Usb::STRING_DESCRIPTORS[0])) {
+		return nullptr;
+	}
 	const char *value = reinterpret_cast<const char*>(PS4Usb::STRING_DESCRIPTORS[index]);
 	return get_string_descriptor(value, index);
 }

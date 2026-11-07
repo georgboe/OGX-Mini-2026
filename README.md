@@ -65,7 +65,7 @@ Unofficial clones, random AliExpress spin-offs, or homebrew PCBs that only “lo
 - Playstation Classic
 - DInput
 - **SteamOS / Bazzite** — Linux desktop / Steam Deck (desktop mode): **DualSense** USB gamepad + **touchpad → HID mouse** (see [SteamOS / Bazzite output mode](Firmware/RP2040/docs/SteamOS_Bazzite_Output_Mode.md))
-- **PS3 / PS4 motion** — Sixaxis / accelerometer passthrough from DS4, DualSense, Switch Pro, and Wii Remote for use with **authentication dongles** (e.g. Brook). **PS4 mode is not native PS4 console output** — licensed PS4 auth is not supported by this firmware (see [PS3 / PS4 motion controls](Firmware/RP2040/docs/PS3_PS4_Motion_Controls.md))
+- **PS3 / PS4 output** — PS3 Sixaxis and PS4 DualShock 4-style output with motion passthrough. PS4 output supports user-supplied authentication keys uploaded through the WebApp; without a compatible key bundle it remains suitable for PC testing or use with an external authentication adapter. This repository does not provide key files. See [PS3 / PS4 motion controls](Firmware/RP2040/docs/PS3_PS4_Motion_Controls.md).
 - Wii U (GameCube Adapter) — **only output mode tested and supported for multi-controller builds** (`MAX_GAMEPADS` > 1; see [Multi-controller builds](#multi-controller-builds-max_gamepads--1))
 - **Wii (Wiimote)** — Pico W / Pico 2 W only; build with `-DOGXM_FIXED_DRIVER=WII`. See [Wii Mode Guide](Firmware/RP2040/docs/Wii_Mode_Guide.md).
 - **PlayStation 1 & 2** — GPIO output to a console controller cable. **Intended use:** **Pico W** or **Pico 2 W** + Bluetooth pad, wired to a PS1/PS2 controller cable plugged into the console (wireless adapter). **USB-A / wired USB host input on those boards does not work in these builds and is out of scope.** See [GPIO pinouts](Firmware/RP2040/docs/GPIO_Output_Pinout_and_Mappings.md).
@@ -75,7 +75,7 @@ Unofficial clones, random AliExpress spin-offs, or homebrew PCBs that only “lo
 
 ![Supported platforms](images/platform-list.png "Supported platforms")
 
-**RP2040 output modes:** **USB device:** XInput (Xbox 360 + XSM3), DInput, PS3, **PS4 (DualShock 4 USB gadget for motion on auth dongles — not licensed PS4 console output)**, **STEAM (SteamOS / Bazzite — DualSense + touchpad mouse)**, **Switch Pro** (Nintendo Switch Pro Controller emulation), Wii U, **Wii (Wiimote, build-option only)**, Xbox OG (Gamepad / Steel Battalion / XRemote), PS Classic, Web App. **GPIO (no USB device):** PS1/PS2, Dreamcast, GameCube, N64 — intended for **Pico W / Pico 2 W** as a wireless bridge (**Bluetooth in** → GPIO out on a hacked controller cable). **USB-A / wired USB host input on those boards is unsupported for these modes.** **Wii, GameCube, and N64 are not in the combo list** — use a dedicated build for those modes (see below).
+**RP2040 output modes:** **USB device:** XInput (Xbox 360 + XSM3), DInput, PS3, **PS4 (DualShock 4 USB gadget; optional user-supplied PS4 auth keys)**, **STEAM (SteamOS / Bazzite — DualSense + touchpad mouse)**, **Switch Pro** (Nintendo Switch Pro Controller emulation), Wii U, **Wii (Wiimote, build-option only)**, Xbox OG (Gamepad / Steel Battalion / XRemote), PS Classic, Web App. **GPIO (no USB device):** PS1/PS2, Dreamcast, GameCube, N64 — intended for **Pico W / Pico 2 W** as a wireless bridge (**Bluetooth in** → GPIO out on a hacked controller cable). **USB-A / wired USB host input on those boards is unsupported for these modes.** **Wii, GameCube, and N64 are not in the combo list** — use a dedicated build for those modes (see below).
 
 ## Changing platforms
 By default the OGX-Mini will emulate an OG Xbox controller, you must hold a button combo for 3 seconds to change which platform you want to play on. Your chosen mode will persist after powering off the device. 
@@ -380,4 +380,3 @@ When you build with ESP-IDF, Cmake will run a python script that copies the nece
 
 - **Xbox 360 console authentication:** XInput builds that work on retail Xbox 360 consoles use [libxsm3](https://github.com/InvoxiPlayGames/libxsm3) (Xbox Security Method 3). libxsm3 is licensed under the GNU Lesser General Public License v2.1 or later; see `Firmware/external/libxsm3/LICENSE.txt`. libxsm3 credits oct0xor, emoose (ExCrypt), and sanjay900; see `Firmware/external/libxsm3/README.md`.
 - **Other dependencies:** See the root `LICENSE` file and the `Firmware/external` directory for Bluepad32, BTStack, TinyUSB, Pico SDK, and other third-party licenses.
-

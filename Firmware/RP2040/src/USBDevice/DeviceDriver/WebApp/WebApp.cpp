@@ -4,6 +4,8 @@
 #include "Board/ogxm_log.h"
 #include "Descriptors/CDCDev.h"
 #include "USBDevice/DeviceDriver/WebApp/WebApp.h"
+#include "USBDevice/DeviceDriver/PS4/PS4Auth.h"
+#include "Board/board_api.h"
 
 void WebAppDevice::initialize() 
 {
@@ -67,8 +69,10 @@ bool WebAppDevice::write_serial(const void* buffer, size_t len)
         {
             size_t written = tud_cdc_write(buf_ptr + total_written, len - total_written);
             total_written += written;
-            tud_cdc_write_flush();
         }
+        // Always flush, even when the TX buffer is full: flushing is what drains it.
+        // Without this the loop spins forever once the buffer fills (1024 bytes) and the host loses the device.
+        tud_cdc_write_flush();
     }
     OGXM_LOG("Wrote %d bytes\n", total_written);
     OGXM_LOG_HEX(buf_ptr, total_written);
@@ -220,6 +224,9 @@ void WebAppDevice::write_error()
     write_packet(packet_in);
 }
 
+static constexpr uint32_t GP_REPORT_INTERVAL_MS = 16;
+static uint32_t last_gp_report_ms = 0;
+
 void WebAppDevice::process(const uint8_t idx, Gamepad& gamepad) 
 {
     if (!tud_cdc_connected())
@@ -289,14 +296,87 @@ void WebAppDevice::process(const uint8_t idx, Gamepad& gamepad)
                 }
                 break;
 
+            case PacketID::PS4_KEYS_QUERY:
+            {
+                Packet response{};
+                response.header.packet_id = PacketID::PS4_KEYS_PRESENT;
+                response.header.chunks_total = 1;
+                response.header.chunk_len = 1;
+                response.data[0] = PS4Auth::keys_valid() ? 1 : 0;
+                (void)write_packet(response);
+                break;
+            }
+
+            case PacketID::PS4_KEYS_UPLOAD:
+            {
+                std::array<uint8_t, PS4Auth::PAYLOAD_SIZE> key_bundle{};
+                size_t offset = 0;
+                const uint8_t total = packet_out.header.chunks_total;
+                bool valid = total > 0 && total == (PS4Auth::PAYLOAD_SIZE + packet_out.data.size() - 1) / packet_out.data.size();
+                auto send_key_status = [this](uint8_t status) {
+                    Packet response{};
+                    response.header.packet_id = PacketID::PS4_KEYS_STATUS;
+                    response.header.chunks_total = 1;
+                    response.header.chunk_len = 1;
+                    response.data[0] = status;
+                    (void)write_packet(response);
+                };
+                send_key_status(3); // The first upload packet reached the firmware.
+                for (uint8_t chunk = 0; valid && chunk < total; ++chunk) {
+                    const size_t expected_len = (PS4Auth::PAYLOAD_SIZE - offset < packet_out.data.size())
+                        ? PS4Auth::PAYLOAD_SIZE - offset : packet_out.data.size();
+                    if (packet_out.header.packet_id != PacketID::PS4_KEYS_UPLOAD ||
+                        packet_out.header.chunks_total != total || packet_out.header.chunk_idx != chunk ||
+                        packet_out.header.chunk_len != expected_len ||
+                        offset + packet_out.header.chunk_len > key_bundle.size()) {
+                        valid = false;
+                        break;
+                    }
+                    std::memcpy(key_bundle.data() + offset, packet_out.data.data(), packet_out.header.chunk_len);
+                    offset += packet_out.header.chunk_len;
+                    if (chunk + 1 < total && !read_packet(packet_out, true)) valid = false;
+                }
+                valid = valid && offset == key_bundle.size();
+                // Check the RSA key in RAM first so a bad upload can be reported without a reboot.
+                valid = valid && PS4Auth::validate_bundle(key_bundle.data(), key_bundle.size());
+                if (!valid) {
+                    send_key_status(0);
+                    break;
+                }
+                // Keys verified; tell the web app we are saving and rebooting, and give
+                // the status packet time to leave before USB goes down.
+                send_key_status(2);
+                const uint32_t flush_start = board_api::ms_since_boot();
+                while (board_api::ms_since_boot() - flush_start < 100) {
+                    tud_task();
+                }
+                // Flash erase/program hangs with Core1 (BT) and USB/timer IRQs live (same as
+                // profile saves): halt Core1 and disconnect USB, write, then reboot.
+                board_api::usb::disconnect_all();
+                (void)PS4Auth::store_bundle(key_bundle.data(), key_bundle.size());
+                if (packet_out.header.device_driver != DeviceDriverType::WEBAPP &&
+                    user_settings_.is_valid_driver(packet_out.header.device_driver))
+                {
+                    (void)user_settings_.store_driver_type_only(packet_out.header.device_driver);
+                }
+                else
+                {
+                    (void)user_settings_.store_driver_type_only(DeviceDriverType::PS4);
+                }
+                board_api::reboot();
+                break;
+            }
+
             default:
                 // write_response(PacketID::RESP_ERROR);
                 return;
         }
     } 
-    else if (gamepad.new_pad_in())
+    else if (gamepad.new_pad_in() && board_api::ms_since_boot() - last_gp_report_ms >= GP_REPORT_INTERVAL_MS)
     {
-        OGXM_LOG("Writing gamepad input\n");
+        // Throttled: an unlimited stream overflows the USB serial output and the host drops the device.
+        // The pending state is only consumed when it is actually sent.
+        last_gp_report_ms = board_api::ms_since_boot();
         Gamepad::PadIn gp_in = gamepad.get_pad_in();
         write_gamepad(idx, gp_in);
     }
